@@ -7,6 +7,8 @@ import { isLate, dateKey, calcWorkMinutes } from "../utils/time.js";
 
 export const checkIn = async (req, res) => {
   try {
+
+  
    
     const { employeeId } = req.user;
 

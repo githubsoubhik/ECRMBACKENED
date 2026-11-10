@@ -8,16 +8,22 @@ import jwt from "jsonwebtoken";
 // dotenv.config();
 
 
+// const cookieOptions = () => ({
+
+
+//   httpOnly: true,
+//   secure: process.env.NODE_ENV === "production",
+//   sameSite: "lax", 
+//   maxAge: 24*60*60*1000,
+// }); 
+
 const cookieOptions = () => ({
-
-
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax", 
-  maxAge: 24*60*60*1000,
-}); 
-
-
+  secure: process.env.COOKIE_SECURE === "true", // leave unset on http
+  sameSite: "lax",
+  path: "/",
+  maxAge: 24 * 60 * 60 * 1000,
+});
 
 const generateToken = (emp) => {
   return jwt.sign(

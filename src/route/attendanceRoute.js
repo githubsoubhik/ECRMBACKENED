@@ -1,30 +1,33 @@
 
+import express from "express";
 
-router.use(authenticateToken);
+import {
+  checkIn,
+  checkOut,
+  getAll,
+  getEmployee
+} from "../controller/attendanceController.js";
 
-// Employee check-in with optional photo.
+import {
+  uploadAttendancePhoto
+} from "../middleware/uploadMiddleware.js";
+
+const router = express.Router();
+
+// Employee check-in with optional photo
 router.post(
   "/check-in",
   uploadAttendancePhoto.single("checkInPhoto"),
   checkIn
 );
 
-// Employee check-out.
-router.post(
-  "/check-out",
-  checkOut
-);
+// Employee check-out
+router.post("/check-out", checkOut);
 
-// Attendance list.
-router.get(
-  "/all",
-  getAll
-);
+// Attendance list
+router.get("/all", getAll);
 
-// Individual employee monthly attendance.
-router.get(
-  "/employee/:employeeId",
-  getEmployee
-);
+// Individual employee monthly attendance
+router.get("/employee/:employeeId", getEmployee);
 
 export default router;
