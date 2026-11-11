@@ -18,7 +18,7 @@
   import emprouter from './src/route/employeeRoute.js';
 
 
-  import attendanceRouter from "./src/models/attendanceperday.js";
+  import attendanceRouter from "./src/route/attendanceRoute.js"
 
   import cors from 'cors';
   import helmet from 'helmet';
@@ -44,7 +44,7 @@
 
 
 
-
+  app.use(cookieParser());
 
   // Middleware: parse JSON request bodies
   app.use(express.json({ limit: "10kb" }));
@@ -65,7 +65,7 @@
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 
 
-  app.use(cookieParser());
+
 
 
   // Home route

@@ -19,7 +19,9 @@ import jwt from "jsonwebtoken";
 
 const cookieOptions = () => ({
   httpOnly: true,
-  secure: process.env.COOKIE_SECURE === "true", // leave unset on http
+  // secure: process.env.COOKIE_SECURE === "true", // leave unset on http
+    secure: process.env.COOKIE_SECURE === "true",
+  secure: false,
   sameSite: "lax",
   path: "/",
   maxAge: 24 * 60 * 60 * 1000,
@@ -27,7 +29,12 @@ const cookieOptions = () => ({
 
 const generateToken = (emp) => {
   return jwt.sign(
-    { id: emp._id, employeeId: emp.employeeId, role: emp.role },
+       {
+      id: emp._id,
+      employeeId: emp.employeeId,
+      role: String(emp.role).toLowerCase(),
+      department: emp.department,
+    },
     process.env.JWT_SECRET,
     { expiresIn: "1d" }
   );

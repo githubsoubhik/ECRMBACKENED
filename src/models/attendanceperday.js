@@ -1,111 +1,80 @@
-// import  mongoose  from "mongoose";
-
-// const attendanceSchema = new mongoose.Schema({
-//   employeeId: { type: String, required: true, index: true }, 
-//   department: String,
-//   dateKey: { type: String, required: true },                 
-//   checkIn: Date,
-//   checkOut: Date,
-//   breaks: [{ start: Date, end: Date }],
-//   workMinutes: { type: Number, default: 0 },
-//   status: { type: String, enum: ["Present", "Late", "Absent", "Leave", "Half Day"], default: "Present" },
-//   checkInPhoto: String,
-
-//   markedBy: String,                                           // who marked it
-// }, { timestamps: true });
-
-// // prevents double check-in on the same day
-// attendanceSchema.index({ employeeId: 1, dateKey: 1 }, { unique: true });
-
-// const  Attendance = mongoose.model("Attendance", attendanceSchema);
-
-
-// export default Attendance;
-
-
-
 import mongoose from "mongoose";
+
+export const ATTENDANCE_STATUS = ["Present", "Late", "Absent", "Leave", "Half Day"];
 
 const breakSchema = new mongoose.Schema(
   {
-    start: {
-      type: Date,
-      required: true
-    },
+    start: { type: Date, required: true },
     end: {
       type: Date,
-      default: null
-    }
+      validate: {
+        validator: function (v) {
+          return !v || v >= this.start;
+        },
+        message: "Break end must be after break start",
+      },
+    },
   },
   { _id: false }
 );
 
 const attendanceSchema = new mongoose.Schema(
   {
-    employeeId: {
-      type: String,
-      required: true,
-      index: true
-    },
+    employeeId: { type: String, required: true, trim: true },
+    department: { type: String, trim: true },
 
-    department: {
-      type: String,
-      default: ""
-    },
-
+    // Format: YYYY-MM-DD, generated in Asia/Kolkata timezone
     dateKey: {
       type: String,
-      required: true
+      required: true,
+      match: [/^\d{4}-\d{2}-\d{2}$/, "dateKey must be YYYY-MM-DD"],
     },
 
-    checkIn: {
-      type: Date,
-      default: null
-    },
-
+    checkIn: Date,
     checkOut: {
       type: Date,
-      default: null
+      validate: {
+        validator: function (v) {
+          return !v || !this.checkIn || v >= this.checkIn;
+        },
+        message: "Check-out must be after check-in",
+      },
     },
 
-    breaks: {
-      type: [breakSchema],
-      default: []
-    },
+    breaks: [breakSchema],
+    workMinutes: { type: Number, default: 0, min: 0 },
 
-    workMinutes: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
+    status: { type: String, enum: ATTENDANCE_STATUS, required: true },
 
-    status: {
-      type: String,
-      enum: ["Present", "Late", "Absent", "Leave", "Half Day"],
-      default: "Present"
-    },
+    checkInPhoto: String,
 
-    checkInPhoto: {
-      type: String,
-      default: ""
-    },
-
-    markedBy: {
-      type: String,
-      default: null
-    }
+    markedBy: { type: String },                     
+    source: { type: String, enum: ["self", "admin", "biometric"], default: "self" },
   },
-  {
-    timestamps: true
+  { timestamps: true }
+);
+
+// One record per employee per day (also covers employeeId-only queries)
+attendanceSchema.index({ employeeId: 1, dateKey: 1 }, { unique: true });
+// Daily / department reports
+attendanceSchema.index({ dateKey: 1, department: 1 });
+
+
+
+// Auto-calculate work minutes
+attendanceSchema.pre("save", function () {
+  if (this.checkIn && this.checkOut) {
+    const breakMs = (this.breaks || []).reduce(
+      (sum, b) => (b.start && b.end ? sum + (b.end - b.start) : sum),
+      0
+    );
+    const total = this.checkOut - this.checkIn - breakMs;
+    this.workMinutes = Math.max(0, Math.round(total / 60000));
   }
-);
+});
 
-// One employee can have only one attendance record per date.
-attendanceSchema.index(
-  { employeeId: 1, dateKey: 1 },
-  { unique: true }
-);
-
-const Attendance = mongoose.model("Attendance", attendanceSchema);
+const Attendance =
+  mongoose.models.Attendance || mongoose.model("Attendance", attendanceSchema);
 
 export default Attendance;
+

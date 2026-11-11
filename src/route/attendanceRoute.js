@@ -1,33 +1,25 @@
-
 import express from "express";
-
-import {
-  checkIn,
-  checkOut,
-  getAll,
-  getEmployee
-} from "../controller/attendanceController.js";
-
-import {
-  uploadAttendancePhoto
-} from "../middleware/uploadMiddleware.js";
+import { breakEnd, breakStart, checkIn, checkOut, getAll, getEmployee } from "../controller/attendancecheck.js";
+import { processAttendancePhoto, uploadAttendancePhoto } from "../middleware/uploadMiddleware.js";
+import { protect } from "../middleware/authMiddleWare.js";
 
 const router = express.Router();
 
-// Employee check-in with optional photo
+router.use(protect); // every attendance route requires login
+
 router.post(
   "/check-in",
-  uploadAttendancePhoto.single("checkInPhoto"),
+  uploadAttendancePhoto("checkInPhoto"),
+  processAttendancePhoto,
   checkIn
 );
 
-// Employee check-out
 router.post("/check-out", checkOut);
 
-// Attendance list
-router.get("/all", getAll);
-
-// Individual employee monthly attendance
+router.get("/all", getAll);                    
 router.get("/employee/:employeeId", getEmployee);
+
+router.post("/break-start", breakStart);
+router.post("/break-end", breakEnd);
 
 export default router;

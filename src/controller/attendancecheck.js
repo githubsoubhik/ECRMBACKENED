@@ -1,8 +1,9 @@
+
+
 import Attendance from "../models/attendanceperday.js";
-import Employee from "../models/employee.js";
-
-
 import { isLate, dateKey, calcWorkMinutes } from "../utils/time.js";
+
+import  Employee from "../models/employee.js";
 
 
 export const checkIn = async (req, res) => {
@@ -155,47 +156,92 @@ export const checkOut = async (req, res) => {
 
 //get all attendance 
 
+// export const getAll = async (req, res) => {
+//   try {
+//     const {
+//       date = dateKey(),
+//       department,
+//       status,
+//     } = req.query;
+
+//     const query = {
+//       dateKey: date,
+//     };
+
+//     if (status) {
+//       query.status = status;
+//     }
+
+//     const role = String(req.user.role).toLowerCase();
+
+//     // Leader can only see their department.
+//     if (role === "leader") {
+//       query.department = req.user.department;
+//     } else if (department) {
+//       query.department = department;
+//     }
+
+//     const records = await Attendance.find(query)
+//       .sort({ checkIn: 1 });
+
+//     return res.status(200).json({
+//       success: true,
+//       count: records.length,
+//       data: records,
+//     });
+
+//   } catch (error) {
+//     console.error("Get attendance error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Unable to fetch attendance",
+//     });
+//   }
+// };
+
+const FULL_ACCESS = ["admin", "hr", "manager"];
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+// getAll: access + validation
 export const getAll = async (req, res) => {
   try {
-    const {
-      date = dateKey(),
-      department,
-      status,
-    } = req.query;
+    const role = String(req.user.role).toLowerCase();
+    if (role !== "leader" && !FULL_ACCESS.includes(role)) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
 
-    const query = {
-      dateKey: date,
-    };
+    const date = String(req.query.date || dateKey());
+    if (!DATE_RE.test(date)) {
+      return res.status(400).json({ success: false, message: "Date must be YYYY-MM-DD" });
+    }
 
-    if (status) {
+    const query = { dateKey: date };
+
+    if (req.query.status) {
+      const status = String(req.query.status);
+      if (!ATTENDANCE_STATUS.includes(status)) {
+        return res.status(400).json({ success: false, message: "Invalid status" });
+      }
       query.status = status;
     }
 
-    const role = String(req.user.role).toLowerCase();
+    if (role === "leader") query.department = req.user.department;
+    else if (req.query.department) query.department = String(req.query.department);
 
-    // Leader can only see their department.
-    if (role === "leader") {
-      query.department = req.user.department;
-    } else if (department) {
-      query.department = department;
-    }
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Number(req.query.limit) || 50);
 
-    const records = await Attendance.find(query)
-      .sort({ checkIn: 1 });
+    const [records, total] = await Promise.all([
+      Attendance.find(query).sort({ checkIn: 1 }).skip((page - 1) * limit).limit(limit).lean(),
+      Attendance.countDocuments(query),
+    ]);
 
-    return res.status(200).json({
-      success: true,
-      count: records.length,
-      data: records,
-    });
-
+    return res.status(200).json({ success: true, total, page, count: records.length, data: records });
   } catch (error) {
     console.error("Get attendance error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Unable to fetch attendance",
-    });
+    return res.status(500).json({ success: false, message: "Unable to fetch attendance" });
   }
 };
 
@@ -265,5 +311,44 @@ export const getEmployee = async (req, res) => {
       success: false,
       message: "Unable to fetch employee attendance",
     });
+  }
+};
+
+
+
+export const breakStart = async (req, res) => {
+  try {
+    const rec = await Attendance.findOne({ employeeId: req.user.employeeId, dateKey: dateKey() });
+
+    if (!rec || !rec.checkIn)
+      return res.status(400).json({ success: false, message: "Please check in first" });
+    if (rec.checkOut)
+      return res.status(409).json({ success: false, message: "Already checked out" });
+    if (rec.breaks.some((b) => !b.end))
+      return res.status(409).json({ success: false, message: "A break is already running" });
+
+    rec.breaks.push({ start: new Date() });
+    await rec.save();
+    return res.status(200).json({ success: true, message: "Break started", data: rec });
+  } catch (error) {
+    console.error("Break start error:", error);
+    return res.status(500).json({ success: false, message: "Unable to start break" });
+  }
+};
+
+export const breakEnd = async (req, res) => {
+  try {
+    const rec = await Attendance.findOne({ employeeId: req.user.employeeId, dateKey: dateKey() });
+    const open = rec?.breaks.find((b) => !b.end);
+
+    if (!open)
+      return res.status(400).json({ success: false, message: "No running break" });
+
+    open.end = new Date();
+    await rec.save();
+    return res.status(200).json({ success: true, message: "Break ended", data: rec });
+  } catch (error) {
+    console.error("Break end error:", error);
+    return res.status(500).json({ success: false, message: "Unable to end break" });
   }
 };
