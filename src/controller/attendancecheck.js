@@ -6,6 +6,9 @@ import { isLate, dateKey, calcWorkMinutes } from "../utils/time.js";
 import  Employee from "../models/employee.js";
 
 
+
+// check in
+
 export const checkIn = async (req, res) => {
   try {
 
@@ -94,6 +97,8 @@ export const checkIn = async (req, res) => {
   }
 };
 
+
+// check out 
 
 export const checkOut = async (req, res) => {
   try {
@@ -314,7 +319,7 @@ export const getEmployee = async (req, res) => {
   }
 };
 
-
+// break strat
 
 export const breakStart = async (req, res) => {
   try {
@@ -336,6 +341,9 @@ export const breakStart = async (req, res) => {
   }
 };
 
+
+//   break  end
+
 export const breakEnd = async (req, res) => {
   try {
     const rec = await Attendance.findOne({ employeeId: req.user.employeeId, dateKey: dateKey() });
@@ -350,5 +358,81 @@ export const breakEnd = async (req, res) => {
   } catch (error) {
     console.error("Break end error:", error);
     return res.status(500).json({ success: false, message: "Unable to end break" });
+  }
+};
+
+
+//...today  attendanc status 
+
+
+export const getToday = async (req, res) => {
+  try {
+    const { employeeId } = req.user;
+    const now = new Date();
+    const today = dateKey(now);
+
+    const rec = await Attendance.findOne({ employeeId, dateKey: today }).lean();
+
+    // Nothing marked yet today
+    if (!rec || !rec.checkIn) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          employeeId,
+          dateKey: today,
+          checkIn: null,
+          checkInPhoto: null,
+          checkOut: null,
+          breaks: [],
+          state: "not_checked_in",
+          status: "Not Marked",
+          onBreak: false,
+          breakMinutes: 0,
+          workMinutes: 0,
+          canCheckIn: true,
+          canCheckOut: false,
+          canStartBreak: false,
+          canEndBreak: false,
+        },
+      });
+    }
+
+    const breaks = rec.breaks || [];
+    const openBreak = breaks.find((b) => !b.end);
+
+    // Completed breaks + the running one (if any)
+    const breakMs = breaks.reduce((sum, b) => {
+      const end = b.end ? new Date(b.end) : rec.checkOut ? new Date(rec.checkOut) : now;
+      return sum + Math.max(0, end - new Date(b.start));
+    }, 0);
+
+    const endPoint = rec.checkOut ? new Date(rec.checkOut) : now;
+    const workMs = Math.max(0, endPoint - new Date(rec.checkIn) - breakMs);
+
+    const state = rec.checkOut ? "checked_out" : openBreak ? "on_break" : "checked_in";
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        employeeId,
+        dateKey: today,
+        checkIn: rec.checkIn,
+        checkInPhoto: rec.checkInPhoto || null,
+        checkOut: rec.checkOut || null,
+        breaks: breaks.map((b) => ({ start: b.start, end: b.end || null })),
+        state,
+        status: rec.status, // Present | Late | ...
+        onBreak: !!openBreak,
+        breakMinutes: Math.round(breakMs / 60000),
+        workMinutes: Math.round(workMs / 60000),
+        canCheckIn: false,
+        canCheckOut: state === "checked_in" || state === "on_break",
+        canStartBreak: state === "checked_in",
+        canEndBreak: state === "on_break",
+      },
+    });
+  } catch (error) {
+    console.error("Today attendance error:", error);
+    return res.status(500).json({ success: false, message: "Unable to fetch today's attendance" });
   }
 };

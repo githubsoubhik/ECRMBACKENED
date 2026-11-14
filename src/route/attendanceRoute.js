@@ -1,5 +1,5 @@
 import express from "express";
-import { breakEnd, breakStart, checkIn, checkOut, getAll, getEmployee } from "../controller/attendancecheck.js";
+import { breakEnd, breakStart, checkIn, checkOut, getAll, getEmployee, getToday } from "../controller/attendancecheck.js";
 import { processAttendancePhoto, uploadAttendancePhoto } from "../middleware/uploadMiddleware.js";
 import { protect } from "../middleware/authMiddleWare.js";
 
@@ -14,12 +14,16 @@ router.post(
   checkIn
 );
 
+
+router.get("/today", protect, getToday);   
 router.post("/check-out", checkOut);
 
 router.get("/all", getAll);                    
-router.get("/employee/:employeeId", getEmployee);
+
 
 router.post("/break-start", breakStart);
 router.post("/break-end", breakEnd);
+
+router.get("/employee/:employeeId", getEmployee);
 
 export default router;
