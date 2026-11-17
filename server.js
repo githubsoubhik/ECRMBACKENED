@@ -108,6 +108,9 @@ app.use("/api/attendance", attendanceRouter);
 
 
 
+
+
+
   // Connect to MongoDB, then start Express
   const startServer = async () => {
     try {

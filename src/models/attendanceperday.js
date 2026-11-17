@@ -73,8 +73,18 @@ attendanceSchema.pre("save", function () {
   }
 });
 
+// const Attendance =
+//   mongoose.models.Attendance || mongoose.model("Attendance", attendanceSchema);
+
+// export default Attendance;
+
 const Attendance =
-  mongoose.models.Attendance || mongoose.model("Attendance", attendanceSchema);
+  mongoose.models.Attendance ||
+  mongoose.model(
+    "Attendance",
+    attendanceSchema,
+    "attendances"
+  );
 
 export default Attendance;
 

@@ -24,6 +24,6 @@ router.get("/all", getAll);
 router.post("/break-start", breakStart);
 router.post("/break-end", breakEnd);
 
-router.get("/employee/:employeeId", getEmployee);
+router.get("/employee/:employeeId", protect, getEmployee);
 
 export default router;
