@@ -50,6 +50,19 @@ const attendanceSchema = new mongoose.Schema(
 
     markedBy: { type: String },                     
     source: { type: String, enum: ["self", "admin", "biometric"], default: "self" },
+
+    remarks:      { type: String, trim: true, maxlength: 300 },
+    source:       { type: String, enum: ["self", "admin"], default: "self" },
+    markedBy:     String,   // employeeId of the editor
+    markedByName: String,
+    markedByRole: String,
+    markedAt:     Date,
+    editLog: [{
+      _id: false,
+      at: Date, by: String, byName: String, byRole: String, remarks: String,
+      before: { status: String, checkIn: Date, checkOut: Date },
+      after:  { status: String, checkIn: Date, checkOut: Date },
+    }],
   },
   { timestamps: true }
 );

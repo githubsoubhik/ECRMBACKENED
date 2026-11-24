@@ -162,49 +162,7 @@ export const checkOut = async (req, res) => {
 
 //get all attendance 
 
-// export const getAll = async (req, res) => {
-//   try {
-//     const {
-//       date = dateKey(),
-//       department,
-//       status,
-//     } = req.query;
 
-//     const query = {
-//       dateKey: date,
-//     };
-
-//     if (status) {
-//       query.status = status;
-//     }
-
-//     const role = String(req.user.role).toLowerCase();
-
-//     // Leader can only see their department.
-//     if (role === "leader") {
-//       query.department = req.user.department;
-//     } else if (department) {
-//       query.department = department;
-//     }
-
-//     const records = await Attendance.find(query)
-//       .sort({ checkIn: 1 });
-
-//     return res.status(200).json({
-//       success: true,
-//       count: records.length,
-//       data: records,
-//     });
-
-//   } catch (error) {
-//     console.error("Get attendance error:", error);
-
-//     return res.status(500).json({
-//       success: false,
-//       message: "Unable to fetch attendance",
-//     });
-//   }
-// };
 
 const FULL_ACCESS = ["admin", "hr", "manager"];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -244,7 +202,47 @@ export const getAll = async (req, res) => {
       Attendance.countDocuments(query),
     ]);
 
-    return res.status(200).json({ success: true, total, page, count: records.length, data: records });
+    
+
+        const employeeIds = records.map(r => r.employeeId);
+
+        const employees = await Employee.find({
+          employeeId: { $in: employeeIds }
+        })
+          .select("employeeId firstName lastName department designation profileImage")
+          .lean();
+
+        const employeeMap = new Map(
+          employees.map(employee => [
+            employee.employeeId.replace(/\s+/g, "").toUpperCase(),
+            employee
+          ])
+        );
+
+        const data = records.map(record => {
+          const employee = employeeMap.get(
+            record.employeeId.replace(/\s+/g, "").toUpperCase()
+          );
+
+          return {
+            ...record,
+            name: employee
+              ? `${employee.firstName || ""} ${employee.lastName || ""}`.trim()
+              : record.employeeId,
+            department: employee?.department || record.department || "",
+            designation: employee?.designation || "",
+            photoUrl: employee?.profileImage || "",
+          };
+        });
+
+        return res.status(200).json({
+          success: true,
+          total,
+          page,
+          count: data.length,
+          data,
+        });
+
   } catch (error) {
     console.error("Get attendance error:", error);
     return res.status(500).json({ success: false, message: "Unable to fetch attendance" });
