@@ -13,7 +13,10 @@
   "author": "Soubhik Jana",
   "license": "ISC",
   "dependencies": {
+    "@ai-sdk/openai": "^4.0.122",
+    "ai": "^7.0.181",
     "bcryptjs": "^3.0.3",
+    "cloudinary": "^2.11.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^18.0.6",
@@ -26,6 +29,7 @@
     "multer": "^2.5.0",
     "nodemon": "^3.1.14",
     "router": "^2.2.0",
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "zod": "^4.6.7"
   }
 }

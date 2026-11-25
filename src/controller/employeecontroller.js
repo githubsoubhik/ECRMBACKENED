@@ -102,9 +102,11 @@ export const registerEmployee = async (req, res) => {
 
     // 4. Resolve Image Path (Local Folder Upload or Firebase URL)
 let profileImage = "";
+let profileImagePublicId = "";
 
 if (req.profileImagePath) {
   profileImage = req.profileImagePath;
+  profileImagePublicId = req.profileImagePublicId;
 } else if (req.body.profileImage) {
   profileImage = req.body.profileImage.trim();
 }
@@ -120,6 +122,7 @@ if (req.profileImagePath) {
       department,
       designation: designation.trim(),
       profileImage,
+      profileImagePublicId,
       joiningDate: joiningDate ? new Date(joiningDate) : undefined,
       status: status || 'Active',
       teamLeaderId: teamLeaderId || null,

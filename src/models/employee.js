@@ -63,6 +63,11 @@ const employeeSchema = new mongoose.Schema(
       default: "",
     },
 
+    profileImagePublicId: {
+  type: String,
+  default: null,
+},
+
     joiningDate: {
       type: Date,
       default: Date.now,

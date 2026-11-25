@@ -73,6 +73,14 @@ attendanceSchema.index({ employeeId: 1, dateKey: 1 }, { unique: true });
 attendanceSchema.index({ dateKey: 1, department: 1 });
 
 
+attendancePhoto: {
+  type: String
+}
+
+attendancePhotoPublicId: {
+  type: String
+  
+}
 
 // Auto-calculate work minutes
 attendanceSchema.pre("save", function () {
@@ -85,6 +93,9 @@ attendanceSchema.pre("save", function () {
     this.workMinutes = Math.max(0, Math.round(total / 60000));
   }
 });
+
+
+
 
 // const Attendance =
 //   mongoose.models.Attendance || mongoose.model("Attendance", attendanceSchema);
