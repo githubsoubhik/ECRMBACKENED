@@ -1,106 +1,12 @@
-// import multer from "multer";
-// import sharp from "sharp";
-// import path from "path";
-// import fs from "fs/promises";
-// import { randomUUID } from "crypto";
-// import { fileURLToPath } from "url";
-// import cloudinary from "../config/cloudinary.js";
+// 
 
-
-
-// const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// const uploadDir = path.join(__dirname, "..", "..", "imageUploads");
-// const attendanceDir = path.join(uploadDir, "attendance");
-
-// try {
-//   await fs.mkdir(attendanceDir, { recursive: true }); // also creates uploadDir
-// } catch (err) {
-//   console.error("Could not create upload directory:", err);
-//   throw err;
-// }
-
-// const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-
-// /* ---------- ORIGINAL EXPORTS (used by employeeRoute.js) ---------- */
-
-// export const upload = multer({
-//   storage: multer.memoryStorage(),
-//   limits: { fileSize: 5 * 1024 * 1024, files: 1 },
-//   fileFilter: (req, file, cb) => {
-//     if (!ALLOWED_TYPES.includes(file.mimetype)) {
-//       return cb(new Error("Only JPG, PNG, and WEBP images are allowed."));
-//     }
-//     cb(null, true);
-//   },
-// });
-
-// // ---------- PROFILE IMAGE EXPORTS (used by employeeRoute.js) ---------- */
-
-// export const processProfileImage = async (req, res, next) => {
-//   try {
-//     if (!req.file) return next();
-
-//     const filename = `${randomUUID()}.webp`;
-
-//     await sharp(req.file.buffer)
-//       .rotate()
-//       .resize({ width: 800, height: 800, fit: "inside", withoutEnlargement: true })
-//       .webp({ quality: 75 })
-//       .toFile(path.join(uploadDir, filename));
-
-//     req.profileImagePath = `/imageUploads/${filename}`;
-//     next();
-//   } catch (error) {
-//     next(error);
-//   }
-// };
-
-// /* ---------- ATTENDANCE EXPORTS ---------- */
-
-// export const uploadAttendancePhoto = (fieldName) => (req, res, next) => {
-//   upload.single(fieldName)(req, res, (err) => {
-//     if (!err) return next();
-
-//     const message =
-//       err.code === "LIMIT_FILE_SIZE"
-//         ? "Photo must be under 5 MB"
-//         : err.code === "LIMIT_UNEXPECTED_FILE"
-//         ? `Unexpected file field. Use "${fieldName}"`
-//         : err.message || "Upload failed";
-
-//     return res.status(400).json({ success: false, message });
-//   });
-// };
-
-// export const processAttendancePhoto = async (req, res, next) => {
-//   if (!req.file) return next();
-
-//   try {
-//     const filename = `${randomUUID()}.webp`;
-
-//     await sharp(req.file.buffer)
-//       .rotate()
-//       .resize({ width: 640, height: 640, fit: "inside", withoutEnlargement: true })
-//       .webp({ quality: 75 })
-//       .toFile(path.join(attendanceDir, filename));
-
-//     req.attendancePhotoPath = `/imageUploads/attendance/${filename}`;
-//     req.file.buffer = undefined;
-//     next();
-//   } catch (error) {
-//     return res
-//       .status(400)
-//       .json({ success: false, message: "Invalid or corrupted image file" });
-//   }
-// };
 
 
 import multer from "multer";
 import sharp from "sharp";
-import { Readable } from "stream";
 import { randomUUID } from "crypto";
-
 import cloudinary from "../config/cloudinary.js";
+import { Readable } from "stream";
 
 const ALLOWED_TYPES = [
   "image/jpeg",
@@ -108,22 +14,16 @@ const ALLOWED_TYPES = [
   "image/webp",
 ];
 
-// ======================================
-// MULTER MEMORY STORAGE
-// ======================================
-
 export const upload = multer({
   storage: multer.memoryStorage(),
-
   limits: {
     fileSize: 5 * 1024 * 1024,
     files: 1,
   },
-
   fileFilter: (req, file, cb) => {
     if (!ALLOWED_TYPES.includes(file.mimetype)) {
       return cb(
-        new Error("Only JPG, PNG, and WEBP images are allowed.")
+        new Error("Only JPG, PNG and WEBP images are allowed.")
       );
     }
 
@@ -131,93 +31,137 @@ export const upload = multer({
   },
 });
 
-// ======================================
-// COMMON IMAGE PROCESSING + CLOUDINARY
-// ======================================
-
-const processAndUpload = async (file, folder, maxWidth) => {
-  if (!file) return null;
-
-  // Convert image into optimized WebP
-  const optimizedBuffer = await sharp(file.buffer)
-    .rotate()
-    .resize({
-      width: maxWidth,
-      height: maxWidth,
-      fit: "inside",
-      withoutEnlargement: true,
-    })
-    .webp({
-      quality: 75,
-      effort: 5,
-    })
-    .toBuffer();
-
-  const publicId = randomUUID();
-
-  // Upload WebP buffer to Cloudinary
-  const result = await new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
+// Upload optimized WebP buffer to Cloudinary
+const uploadToCloudinary = (buffer, folder, publicId) => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
       {
         folder,
         public_id: publicId,
         resource_type: "image",
         format: "webp",
+        overwrite: false,
       },
       (error, result) => {
         if (error) {
+          console.error("CLOUDINARY ERROR:");
+          console.dir(error, { depth: 10 });
           return reject(error);
         }
 
-        if (!result) {
-          return reject(new Error("Cloudinary upload returned no result"));
-        }
-
-        resolve(result);
+        resolve({
+          imageUrl: result.secure_url,
+          publicId: result.public_id,
+          format: result.format,
+          bytes: result.bytes,
+        });
       }
     );
 
-    Readable.from([optimizedBuffer]).pipe(uploadStream);
+    Readable.from(buffer).pipe(stream);
   });
-
-  return {
-    imageUrl: result.secure_url,
-    publicId: result.public_id,
-  };
 };
 
-// ======================================
-// EMPLOYEE PROFILE IMAGE
-// ======================================
+// Shared image processor
+const processAndUpload = async (file, folder, width) => {
+  if (!file?.buffer) {
+    throw new Error("Image file buffer is missing");
+  }
 
+  const webpBuffer = await sharp(file.buffer)
+    .rotate()
+    .resize({
+      width,
+      height: width,
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .webp({ quality: 75 })
+    .toBuffer();
+
+  const publicId = randomUUID();
+
+  return uploadToCloudinary(
+    webpBuffer,
+    folder,
+    publicId
+  );
+};
+
+// EMPLOYEE PROFILE IMAGE
 export const processProfileImage = async (req, res, next) => {
   try {
     if (!req.file) return next();
 
     const result = await processAndUpload(
       req.file,
-      "mern-app/employees",
+      "profileimages",
       800
     );
 
     req.profileImagePath = result.imageUrl;
     req.profileImagePublicId = result.publicId;
 
-    req.file.buffer = undefined;
+    console.log("EMPLOYEE IMAGE UPLOADED:", result);
 
-    next();
+    return next();
 
   } catch (error) {
-    console.error("Profile image upload error:", error);
+    console.error("PROFILE IMAGE UPLOAD ERROR:", error);
 
-    next(error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Profile image upload failed",
+    });
   }
 };
 
-// ======================================
-// ATTENDANCE IMAGE UPLOAD MIDDLEWARE
-// ======================================
+// ATTENDANCE PHOTO
+export const processAttendancePhoto = async (req, res, next) => {
+  try {
+    if (!req.file) return next();
 
+
+    const now = new Date();
+
+    const dateParts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(now);
+
+    const parts = Object.fromEntries(
+      dateParts.map(({ type, value }) => [type, value])
+    );
+
+    const folder =
+      `attendance/${parts.year}/${parts.month}/${parts.day}/${employee.employeeId}`;
+
+    const result = await processAndUpload(
+  req.file,
+  folder,
+  640
+);
+
+    req.attendancePhotoPath = result.imageUrl;
+    req.attendancePhotoPublicId = result.publicId;
+
+    console.log("ATTENDANCE IMAGE UPLOADED:", result);
+
+    return next();
+
+  } catch (error) {
+    console.error("ATTENDANCE IMAGE UPLOAD ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Attendance image upload failed",
+    });
+  }
+};
+
+// ATTENDANCE MULTER FIELD
 export const uploadAttendancePhoto = (fieldName) => (
   req,
   res,
@@ -226,47 +170,12 @@ export const uploadAttendancePhoto = (fieldName) => (
   upload.single(fieldName)(req, res, (err) => {
     if (!err) return next();
 
-    const message =
-      err.code === "LIMIT_FILE_SIZE"
-        ? "Photo must be under 5 MB"
-        : err.code === "LIMIT_UNEXPECTED_FILE"
-        ? `Unexpected file field. Use "${fieldName}"`
-        : err.message || "Upload failed";
-
     return res.status(400).json({
       success: false,
-      message,
+      message:
+        err.code === "LIMIT_FILE_SIZE"
+          ? "Photo must be under 5 MB"
+          : err.message || "Image upload failed",
     });
   });
-};
-
-// ======================================
-// ATTENDANCE PHOTO PROCESSING
-// ======================================
-
-export const processAttendancePhoto = async (req, res, next) => {
-  try {
-    if (!req.file) return next();
-
-    const result = await processAndUpload(
-      req.file,
-      "mern-app/attendance",
-      640
-    );
-
-    req.attendancePhotoPath = result.imageUrl;
-    req.attendancePhotoPublicId = result.publicId;
-
-    req.file.buffer = undefined;
-
-    next();
-
-  } catch (error) {
-    console.error("Attendance photo upload error:", error);
-
-    return res.status(400).json({
-      success: false,
-      message: "Invalid image or Cloudinary upload failed",
-    });
-  }
 };

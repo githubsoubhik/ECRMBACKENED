@@ -55,9 +55,12 @@ export const checkIn = async (req, res) => {
 
       status: isLate(now) ? "Late" : "Present",
 
-      checkInPhoto: req.file
-        ? `/imageUploads/${req.file.filename}`
-        : "",
+      // checkInPhoto: req.file
+      //   ? `/imageUploads/${req.file.filename}`
+      //   : "",
+
+      checkInPhoto: req.attendancePhotoPath ?? "",
+attendancePhotoPublicId: req.attendancePhotoPublicId ?? null,
 
       location: {
         lat: req.body.lat
@@ -174,14 +177,66 @@ export const getAll = async (req, res) => {
     const role = String(req.user.role).toLowerCase();
     if (role !== "leader" && !FULL_ACCESS.includes(role)) {
       return res.status(403).json({ success: false, message: "Access denied" });
+
+
     }
 
-    const date = String(req.query.date || dateKey());
-    if (!DATE_RE.test(date)) {
-      return res.status(400).json({ success: false, message: "Date must be YYYY-MM-DD" });
-    }
 
-    const query = { dateKey: date };
+    const { date, month } = req.query;
+
+let query = {};
+
+if (date && month) {
+  return res.status(400).json({
+    success: false,
+    message: "Use either date or month, not both"
+  });
+}
+
+if (month) {
+  const selectedMonth = String(month);
+
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(selectedMonth)) {
+    return res.status(400).json({
+      success: false,
+      message: "Month must be YYYY-MM"
+    });
+  }
+
+  query.dateKey = {
+    $gte: `${selectedMonth}-01`,
+    $lt: (() => {
+      const [year, monthNumber] = selectedMonth.split("-").map(Number);
+      const nextMonth = new Date(Date.UTC(year, monthNumber, 1));
+
+      return `${nextMonth.getUTCFullYear()}-${String(
+        nextMonth.getUTCMonth() + 1
+      ).padStart(2, "0")}-01`;
+    })()
+  };
+
+} else {
+  const selectedDate = String(date || dateKey());
+
+  if (!DATE_RE.test(selectedDate)) {
+    return res.status(400).json({
+      success: false,
+      message: "Date must be YYYY-MM-DD"
+    });
+  }
+
+  query.dateKey = selectedDate;
+}
+
+
+  
+
+    // const date = String(req.query.date || dateKey());
+    // if (!DATE_RE.test(date)) {
+    //   return res.status(400).json({ success: false, message: "Date must be YYYY-MM-DD" });
+    // }
+
+    // const query = { dateKey: date };
 
     if (req.query.status) {
       const status = String(req.query.status);
@@ -190,6 +245,8 @@ export const getAll = async (req, res) => {
       }
       query.status = status;
     }
+
+
 
     if (role === "leader") query.department = req.user.department;
     else if (req.query.department) query.department = String(req.query.department);

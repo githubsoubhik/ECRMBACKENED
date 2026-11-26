@@ -29,13 +29,11 @@ cloudinary.config({
 
 try {
   const result = await cloudinary.api.ping();
-
-  console.log("Cloudinary API test:", result);
+  console.log("Cloudinary API connected:", result.status);
 } catch (error) {
-  console.error("Cloudinary API test failed:", {
+  console.error("Cloudinary API connection failed:", {
     message: error.message,
     http_code: error.http_code,
-    name: error.name,
   });
 }
 
