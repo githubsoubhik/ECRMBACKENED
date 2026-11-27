@@ -15,6 +15,8 @@ router.use(protect); // every attendance route requires login
 router.post(
   "/check-in",
 
+  protect,
+
   uploadAttendancePhoto("checkInPhoto"),
   processAttendancePhoto,
   checkIn

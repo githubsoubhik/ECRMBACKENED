@@ -136,7 +136,7 @@ export const processAttendancePhoto = async (req, res, next) => {
     );
 
     const folder =
-      `attendance/${parts.year}/${parts.month}/${parts.day}/${employee.employeeId}`;
+      `attendance/${parts.year}/${parts.month}/${parts.day}/${req.user.employeeId}`;
 
     const result = await processAndUpload(
   req.file,

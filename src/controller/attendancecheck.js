@@ -17,6 +17,8 @@ export const checkIn = async (req, res) => {
    
     const { employeeId } = req.user;
 
+    console.log("employeeId------------>". employeeId);
+
     // Fetch current employee details from MongoDB.
     const employee = await Employee.findOne({
       employeeId,
